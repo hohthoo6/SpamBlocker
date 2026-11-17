@@ -29,10 +29,14 @@ jobs:
 
       - name: Install Android SDK components
         run: |
+          set -e
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           sdkmanager --version
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+          # android-37 的包名带 .0 后缀（新版本号规则），不加会报 Failed to find package
+          sdkmanager --install "platform-tools" "platforms;android-37.0" "build-tools;36.1.0"
+          echo "== installed platforms =="
+          ls "$ANDROID_HOME/platforms"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -52,7 +56,7 @@ jobs:
           trim() { printf '%s' "$1" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
           SP="$(trim "$KEYSTORE_PASSWORD")"
           KP="$(trim "${KEY_PASSWORD:-$SP}")"
-          AL="$(trim "${KEY_ALIAS:-release}")"
+          AL="$(trim "${KEY_ALIAS:-spamblocker}")"
           [ -z "$SP" ] && { echo "ERROR: secret KEYSTORE_PASSWORD is empty."; exit 1; }
           [ "$KP" != "$SP" ] && { echo "WARNING: KEY_PASSWORD differs from store password, using store password."; KP="$SP"; }
           printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n' | base64 -d > "$RUNNER_TEMP/keystore.jks"
