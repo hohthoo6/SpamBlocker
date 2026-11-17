@@ -1,0 +1,90 @@
+name: Build SpamBlocker Release APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android SDK components
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager --version
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore and verify signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR: secret KEYSTORE_BASE64 is empty."
+            exit 1
+          fi
+          trim() { printf '%s' "$1" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+          SP="$(trim "$KEYSTORE_PASSWORD")"
+          KP="$(trim "${KEY_PASSWORD:-$SP}")"
+          AL="$(trim "${KEY_ALIAS:-release}")"
+          [ -z "$SP" ] && { echo "ERROR: secret KEYSTORE_PASSWORD is empty."; exit 1; }
+          [ "$KP" != "$SP" ] && { echo "WARNING: KEY_PASSWORD differs from store password, using store password."; KP="$SP"; }
+          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \t\r\n' | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          # app/build.gradle.kts 里 storeFile = file("../../keystore.jks")，以 app/ 为基准解析
+          cp "$RUNNER_TEMP/keystore.jks" "$(dirname "$GITHUB_WORKSPACE")/keystore.jks"
+          cp "$RUNNER_TEMP/keystore.jks" "$GITHUB_WORKSPACE/keystore.jks"
+          keytool -list -keystore "$RUNNER_TEMP/keystore.jks" -storepass "$SP" > /dev/null
+          keytool -list -keystore "$RUNNER_TEMP/keystore.jks" -storepass "$SP" -alias "$AL" > /dev/null
+          echo "Keystore verified: alias $AL readable."
+          {
+            echo "ANDROID_KEYSTORE_PASSWORD=$SP"
+            echo "ANDROID_KEY_PASSWORD=$KP"
+            echo "ANDROID_KEY_ALIAS=$AL"
+          } > "$RUNNER_TEMP/signing.env"
+
+      - name: Build release APK (R8)
+        run: |
+          chmod +x ./gradlew
+          set -a
+          . "$RUNNER_TEMP/signing.env"
+          set +a
+          ./gradlew assembleFdroidRelease --no-daemon --stacktrace
+
+      - name: Show APK files
+        if: always()
+        run: find app/build/outputs -name "*.apk" || true
+
+      - name: Upload APK as artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spamblocker-release-apk
+          path: app/build/outputs/apk/fdroid/release/*.apk
+          retention-days: 30
+#（注：内容由AI生成）
