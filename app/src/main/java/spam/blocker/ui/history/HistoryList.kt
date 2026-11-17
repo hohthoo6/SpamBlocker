@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -19,10 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import spam.blocker.R
-import spam.blocker.def.Def
 import spam.blocker.ui.M
 import spam.blocker.ui.history.HistoryOptions.historyTimeColors
-import spam.blocker.ui.history.HistoryOptions.showHistoryIndicator
 import spam.blocker.ui.history.HistoryOptions.showHistoryTimeColor
 import spam.blocker.ui.widgets.BgLaunchApp
 import spam.blocker.ui.widgets.LazyScrollbar
@@ -49,31 +46,13 @@ fun HistoryList(
         SimUtils.listSimCards(ctx).size
     }
 
-    // Just a short alias, that G.xxx it too long
-    var showIndicator by remember(showHistoryIndicator.value) {
-        mutableStateOf(showHistoryIndicator.value)
-    }
-
     LazyScrollbar(state = lazyState) {
-        IndicatorsWrapper(vm) { indicatorChecker, forceRefreshIndicators ->
+        run {
             LazyColumn(
                 state = lazyState,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 itemsIndexed(items = vm.records, key = { _, it -> it.id }) { index, record ->
-                    val indicators = remember { mutableStateOf(listOf<Indicator>()) }
-
-                    LaunchedEffect(record.id, showIndicator, forceRefreshIndicators) {
-                        indicators.value = if (showIndicator)
-                            indicatorChecker(
-                                record.peer,
-                                record.cnap,
-                                record.extraInfo,
-                                record.simSlot
-                            )
-                        else
-                            listOf()
-                    }
                     HistoryContextMenuWrapper(vm, record) { contextMenuExpanded ->
                         key(vm.multiSelect.value) {
                             // Swipe <---->
@@ -92,14 +71,7 @@ fun HistoryList(
                                             // 2. update UI
                                             vm.records[index] = vm.records[index].copy(read = true)
                                         }
-                                        when (vm.forType) {
-                                            Def.ForNumber -> Launcher.openCallConversation(
-                                                ctx,
-                                                record.peer
-                                            )
-
-                                            Def.ForSms -> Launcher.openSMSConversation(ctx, record.peer)
-                                        }
+                                        Launcher.openCallConversation(ctx, record.peer)
                                     }
                                 ),
                                 left = if (vm.multiSelect.value) null else SwipeInfo(
@@ -128,7 +100,6 @@ fun HistoryList(
                                 HistoryCard(
                                     forType = vm.forType,
                                     record = if (vm.multiSelect.value && record.expanded) record.copy(expanded = false) else record,
-                                    indicators = indicators.value,
                                     simCount = simCount,
                                     timeColors = if (showHistoryTimeColor.value) historyTimeColors else null,
                                     selected = record.id in vm.selectedIds,

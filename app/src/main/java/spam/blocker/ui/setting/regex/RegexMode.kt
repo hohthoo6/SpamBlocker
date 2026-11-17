@@ -101,9 +101,6 @@ object RegexMode {
             ContactName(),
             ContactGroup(),
             ContactPrefix(),
-            DatabasePrefix(),
-            Geolocation(),
-            Carrier(),
             CallerName(),
         )
     }

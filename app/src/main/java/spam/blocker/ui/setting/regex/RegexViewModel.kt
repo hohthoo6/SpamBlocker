@@ -3,9 +3,7 @@ package spam.blocker.ui.setting.regex
 import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import spam.blocker.db.ContentRegexTable
 import spam.blocker.db.NumberRegexTable
-import spam.blocker.db.QuickCopyRegexTable
 import spam.blocker.db.RegexRule
 import spam.blocker.db.RegexTable
 import spam.blocker.def.Def
@@ -38,21 +36,13 @@ open class RegexViewModel(
         }
         listCollapsed.value = !listCollapsed.value
         val spf = spf.RegexOptions(ctx)
-        when (forType) {
-            Def.ForNumber -> spf.isNumberCollapsed = listCollapsed.value
-            Def.ForSms -> spf.isContentCollapsed = listCollapsed.value
-            else -> spf.isQuickCopyCollapsed = listCollapsed.value
-        }
+        spf.isNumberCollapsed = listCollapsed.value
     }
 
     fun reloadOptions(ctx: Context) {
         val spf = spf.RegexOptions(ctx)
 
-        listCollapsed.value = when (forType) {
-            Def.ForNumber -> spf.isNumberCollapsed
-            Def.ForSms -> spf.isContentCollapsed
-            else -> spf.isQuickCopyCollapsed
-        }
+        listCollapsed.value = spf.isNumberCollapsed
     }
 
     fun reloadDbAndOptions(ctx: Context) {
@@ -62,5 +52,3 @@ open class RegexViewModel(
 }
 
 class NumberRegexViewModel : RegexViewModel(NumberRegexTable(), Def.ForNumber)
-class ContentRegexViewModel : RegexViewModel(ContentRegexTable(), Def.ForSms)
-class QuickCopyRegexViewModel : RegexViewModel(QuickCopyRegexTable(), Def.ForQuickCopy)

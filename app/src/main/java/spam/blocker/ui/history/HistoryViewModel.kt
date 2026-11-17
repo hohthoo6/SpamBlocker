@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import spam.blocker.db.CallTable
 import spam.blocker.db.HistoryRecord
 import spam.blocker.db.HistoryTable
-import spam.blocker.db.SmsTable
 import spam.blocker.def.Def
 import spam.blocker.ui.history.HistoryOptions.showHistoryBlocked
 import spam.blocker.ui.history.HistoryOptions.showHistoryPassed
@@ -103,5 +102,3 @@ open class HistoryViewModel(
 }
 
 class CallViewModel : HistoryViewModel(Def.ForNumber, CallTable())
-
-class SmsViewModel : HistoryViewModel(Def.ForSms, SmsTable())

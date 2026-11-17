@@ -28,25 +28,18 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import spam.blocker.R
 import spam.blocker.def.Def
-import spam.blocker.service.NotificationListenerService
 import spam.blocker.util.PermissionLauncher.launcherProtected
 import spam.blocker.util.PermissionLauncher.launcherRegular
 import spam.blocker.util.PermissionLauncher.launcherSAF
 import spam.blocker.util.PermissionType.AnswerCalls
 import spam.blocker.util.PermissionType.Basic
 import spam.blocker.util.PermissionType.BatteryUnRestricted
-import spam.blocker.util.PermissionType.Calendar
 import spam.blocker.util.PermissionType.CallLog
 import spam.blocker.util.PermissionType.CallScreening
 import spam.blocker.util.PermissionType.Contacts
-import spam.blocker.util.PermissionType.NotificationAccess
 import spam.blocker.util.PermissionType.PhoneState
 import spam.blocker.util.PermissionType.ReadPhoneNumber
-import spam.blocker.util.PermissionType.ReadSMS
-import spam.blocker.util.PermissionType.ReceiveMMS
-import spam.blocker.util.PermissionType.ReceiveSMS
 import spam.blocker.util.PermissionType.ScheduleAlarm
-import spam.blocker.util.PermissionType.SendSMS
 import spam.blocker.util.PermissionType.ShowOverlay
 import spam.blocker.util.PermissionType.UsageStats
 import spam.blocker.util.PermissionType.WriteSettings
@@ -87,15 +80,10 @@ object PermissionType {
 
     // All Regular permissions
     class Contacts: Regular(Manifest.permission.READ_CONTACTS, R.string.perm_contacts)
-    class ReceiveSMS: Regular(Manifest.permission.RECEIVE_SMS, R.string.perm_receive_sms)
-    class SendSMS: Regular(Manifest.permission.SEND_SMS, R.string.send_sms)
-    class ReceiveMMS: Regular(Manifest.permission.RECEIVE_MMS, R.string.perm_receive_mms)
     class AnswerCalls: Regular(Manifest.permission.ANSWER_PHONE_CALLS, R.string.perm_answer_calls)
     class CallLog: Regular(Manifest.permission.READ_CALL_LOG, R.string.perm_call_logs)
     class PhoneState: Regular(Manifest.permission.READ_PHONE_STATE, R.string.perm_phone_state)
     class ReadPhoneNumber: Regular(Manifest.permission.READ_PHONE_NUMBERS, R.string.perm_read_phone_number)
-    class ReadSMS: Regular(Manifest.permission.READ_SMS, R.string.perm_read_sms)
-    class Calendar: Regular(Manifest.permission.READ_CALENDAR, R.string.perm_read_calendar)
 
 
     // Storage Access Framework (SAF) directory chooser
@@ -171,28 +159,6 @@ object PermissionType {
         descId = R.string.perm_usage_stats,
         intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
     )
-
-    class NotificationAccess(
-        override var descId: Int = R.string.perm_notification_access
-    ): LaunchByIntent() {
-        override fun launcherIntent(ctx: Context): Intent {
-            return Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-        }
-
-        override fun check(ctx: Context): Boolean {
-
-            // This approach will crash on some devices: getString() can return null
-//            val ret = Secure.getString(
-//                ctx.applicationContext.contentResolver,
-//                "enabled_notification_listeners"
-//            )?.contains(ctx.applicationContext.packageName) == true
-
-            val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            return notificationManager.isNotificationListenerAccessGranted(
-                ComponentName(ctx, NotificationListenerService::class.java)
-            )
-        }
-    }
 
     class ShowOverlay(
         override var descId: Int = R.string.perm_show_overlay
@@ -323,17 +289,11 @@ object PermissionLauncher {
 object Permission {
     val callScreening = CallScreening()
     val contacts = Contacts()
-    val receiveSMS = ReceiveSMS()
-    val sendSMS = SendSMS()
-    val receiveMMS = ReceiveMMS()
     val answerCalls = AnswerCalls()
     val callLog = CallLog()
     val phoneState = PhoneState()
     val readPhoneNumber = ReadPhoneNumber()
-    val readSMS = ReadSMS()
-    val calendar = Calendar()
     val writeSettings = WriteSettings()
-    val notificationAccess = NotificationAccess()
     val showOverlay = ShowOverlay()
     val usageStats = UsageStats()
     val batteryUnRestricted = BatteryUnRestricted()
@@ -343,17 +303,11 @@ object Permission {
         return listOf(
             callScreening,
             contacts,
-            receiveSMS,
-            sendSMS,
-            receiveMMS,
             answerCalls,
             callLog,
             phoneState,
             readPhoneNumber,
-            readSMS,
-            calendar,
             writeSettings,
-            notificationAccess,
             showOverlay,
             usageStats,
             batteryUnRestricted,

@@ -27,9 +27,7 @@ import androidx.compose.ui.unit.dp
 import spam.blocker.BuildConfig
 import spam.blocker.G
 import spam.blocker.R
-import spam.blocker.db.BotTable
 import spam.blocker.db.CallTable
-import spam.blocker.db.SmsTable
 import spam.blocker.ui.M
 import spam.blocker.ui.setting.misc.REPO
 import spam.blocker.ui.theme.AppTheme
@@ -145,10 +143,6 @@ class CrashReportActivity : ComponentActivity() {
 
                                         // Clear Call/SMS history
                                         CallTable().clearAll(ctx)
-                                        SmsTable().clearAll(ctx)
-
-                                        // Clear workflow lastLog
-                                        BotTable.clearAllLastLogs(ctx)
 
                                         clearTrigger.value = false
                                     }

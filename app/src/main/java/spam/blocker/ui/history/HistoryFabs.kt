@@ -16,24 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import spam.blocker.Events
 import spam.blocker.G
 import spam.blocker.R
 import spam.blocker.db.HistoryRecord
-import spam.blocker.db.SpamTable
-import spam.blocker.def.Def
-import spam.blocker.service.bot.Daily
-import spam.blocker.service.bot.InterceptCall
-import spam.blocker.service.bot.InterceptSms
-import spam.blocker.service.bot.MyWorkManager
-import spam.blocker.service.bot.PruneHistory
-import spam.blocker.service.bot.serialize
 import spam.blocker.ui.history.HistoryOptions.forceShowSIM
 import spam.blocker.ui.history.HistoryOptions.historyTimeColors
 import spam.blocker.ui.history.HistoryOptions.showHistoryBlocked
 import spam.blocker.ui.history.HistoryOptions.showHistoryCarrier
 import spam.blocker.ui.history.HistoryOptions.showHistoryGeoLocation
-import spam.blocker.ui.history.HistoryOptions.showHistoryIndicator
 import spam.blocker.ui.history.HistoryOptions.showHistoryPassed
 import spam.blocker.ui.history.HistoryOptions.showHistoryTimeColor
 import spam.blocker.ui.setting.LabeledRow
@@ -48,7 +38,6 @@ import spam.blocker.ui.widgets.GreyLabel
 import spam.blocker.ui.widgets.HtmlText
 import spam.blocker.ui.widgets.LabelItem
 import spam.blocker.ui.widgets.MultiColorButton
-import spam.blocker.ui.widgets.NumberInputBox
 import spam.blocker.ui.widgets.Placeholder
 import spam.blocker.ui.widgets.PopupDialog
 import spam.blocker.ui.widgets.PopupSize
@@ -66,11 +55,9 @@ import spam.blocker.util.TimeUtils.FreshnessColor
 import spam.blocker.util.spf
 
 
-private const val HISTORY_CLEANUP_WORK_TAG = "history_cleanup_work_tag"
-
+// Since the workflow(bot) system was removed, expired records are pruned
+//   immediately whenever the history settings change, and on app start.
 fun reScheduleHistoryCleanup(ctx: Context) {
-    MyWorkManager.cancelByTag(ctx, HISTORY_CLEANUP_WORK_TAG)
-
     val spf = spf.HistoryOptions(ctx)
 
     val loggingEnabled = spf.isLoggingEnabled
@@ -78,11 +65,9 @@ fun reScheduleHistoryCleanup(ctx: Context) {
     val ttl = spf.ttl
 
     if (loggingEnabled && expiryEnabled && ttl >= 0) {
-        MyWorkManager.schedule(
-            ctx,
-            scheduleConfig = Daily().serialize(),
-            actionsConfig = listOf(PruneHistory(ttl)).serialize(),
-            workTag = HISTORY_CLEANUP_WORK_TAG
+        val ttlMillis = ttl.toLong() * 24 * 60 * 60 * 1000
+        spam.blocker.db.CallTable().clearRecordsBeforeTimestamp(
+            ctx, System.currentTimeMillis() - ttlMillis
         )
     }
 }
@@ -233,9 +218,6 @@ fun HistoryFabs(
     var loggingEnabled by remember { mutableStateOf(spf.isLoggingEnabled) }
     var expiryEnabled by remember { mutableStateOf(spf.isExpiryEnabled) }
     var ttl by remember { mutableIntStateOf(spf.ttl) }
-    var logSmsContent by remember { mutableStateOf(spf.isLogSmsContentEnabled) }
-    var rows by remember { mutableStateOf<Int?>(spf.initialSmsRowCount) }
-
 
     val settingPopupTrigger = remember { mutableStateOf(false) }
 
@@ -261,39 +243,6 @@ fun HistoryFabs(
 
                                 reScheduleHistoryCleanup(ctx)
                             })
-                        }
-
-                        // Log SMS Content
-                        AnimatedVisibleV(loggingEnabled) {
-                            LabeledRow(
-                                labelId = R.string.sms_content,
-                                helpTooltip = Str(R.string.help_log_sms_content)
-                            ) {
-                                val trigger = remember { mutableStateOf(false) }
-                                PopupDialog(trigger = trigger) {
-                                    NumberInputBox(
-                                        label = { GreyLabel(Str(R.string.initial_row_count)) },
-                                        intValue = rows,
-                                        onValueChange = { newVal, hasError ->
-                                            if (!hasError) {
-                                                rows = newVal
-                                                spf.initialSmsRowCount = rows!!
-                                                vm.reload(ctx)
-                                            }
-                                        }
-                                    )
-                                }
-                                if (logSmsContent) {
-                                    val nRows = ctx.resources.getQuantityString(R.plurals.rows, rows!!, rows)
-
-                                    GreyButton(label = nRows) { trigger.value = true }
-                                }
-                                SwitchBox(checked = logSmsContent, onCheckedChange = { isOn ->
-                                    logSmsContent = isOn
-                                    spf.isLogSmsContentEnabled = isOn
-                                    vm.reload(ctx)
-                                })
-                            }
                         }
 
                         // Expiry
@@ -342,17 +291,6 @@ fun HistoryFabs(
                             SwitchBox(checked = showHistoryBlocked.value, onCheckedChange = { isOn ->
                                 spf.showBlocked = isOn
                                 showHistoryBlocked.value = isOn
-                            })
-                        }
-
-                        // Rule Indicator
-                        LabeledRow(
-                            labelId = R.string.rule_indicator,
-                            helpTooltip = Str(R.string.help_show_rule_indicator),
-                        ) {
-                            SwitchBox(checked = showHistoryIndicator.value, onCheckedChange = { isOn ->
-                                spf.showIndicator = isOn
-                                showHistoryIndicator.value = isOn
                             })
                         }
 
@@ -448,62 +386,6 @@ fun HistoryFabs(
             val selectedRecords = vm.records.filter { it.id in selectedIds }
             val selectedNumbers = selectedRecords.map { it.peer }.distinct()
 
-            // Report
-            val reportAvailable = remember(vm.forType) {
-                G.apiReportVM.table.listAll(ctx).any {
-                    it.enabled && when (vm.forType) {
-                        Def.ForNumber -> it.actions.firstOrNull() is InterceptCall
-                        else -> it.actions.firstOrNull() is InterceptSms
-                    }
-                }
-            }
-            if (reportAvailable) {
-                val reportTrigger = remember { mutableStateOf(false) }
-                var reportRecords by remember { mutableStateOf<List<HistoryRecord>>(emptyList()) }
-                if (reportRecords.isNotEmpty()) {
-                    BatchReportSpamDialog(
-                        trigger = reportTrigger,
-                        forType = vm.forType,
-                        records = reportRecords,
-                    )
-                }
-                Fab(
-                    visible = true,
-                    iconId = R.drawable.ic_upload_to_cloud,
-                    bgColor = C.warning,
-                ) {
-                    if (selectedRecords.isNotEmpty()) {
-                        reportRecords = selectedRecords.toList()
-                        reportTrigger.value = true
-                    }
-                }
-            }
-
-            // Add to db
-            var dbRevision by remember { mutableIntStateOf(0) }
-            Events.spamDbUpdated.Listen { dbRevision++ }
-            val allInDb = remember(selectedNumbers, dbRevision) {
-                selectedNumbers.isNotEmpty() && selectedNumbers.all { SpamTable.findByNumber(ctx, it) != null }
-            }
-            Fab(
-                visible = true,
-                iconId = if (allInDb) R.drawable.ic_db_delete else R.drawable.ic_db_add,
-                bgColor = if (allInDb) C.error else C.infoBlue,
-            ) {
-                if (selectedNumbers.isNotEmpty()) {
-                    selectedNumbers.forEach { number ->
-                        val existing = SpamTable.findByNumber(ctx, number)
-                        if (allInDb) {
-                            if (existing != null) SpamTable.deleteById(ctx, existing.id)
-                        } else if (existing == null) {
-                            SpamTable.add(ctx, number)
-                        }
-                    }
-                    dbRevision++
-                    Events.spamDbUpdated.fire()
-                }
-            }
-
             // Delete
             val deleteConfirm = remember { mutableStateOf(false) }
             PopupDialog(
@@ -540,17 +422,8 @@ fun HistoryFabs(
                 buttons = {
                     StrokeButton(label = Str(R.string.delete), color = C.error) {
                         deleteConfirm.value = false
-                        when (vm.forType) {
-                            Def.ForNumber -> {
-                                G.callVM.table.clearAll(ctx)
-                                G.callVM.records.clear()
-                            }
-
-                            Def.ForSms -> {
-                                G.smsVM.table.clearAll(ctx)
-                                G.smsVM.records.clear()
-                            }
-                        }
+                        G.callVM.table.clearAll(ctx)
+                        G.callVM.records.clear()
                     }
                 }
             ) {

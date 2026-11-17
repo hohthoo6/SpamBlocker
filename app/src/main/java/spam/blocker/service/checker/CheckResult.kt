@@ -1,113 +1,41 @@
 package spam.blocker.service.checker
 
 import android.content.Context
-import android.telecom.Connection
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import spam.blocker.G
 import spam.blocker.R
-import spam.blocker.db.ContentRegexTable
-import spam.blocker.db.HistoryRecord
 import spam.blocker.db.Notification.Channel
 import spam.blocker.db.Notification.ChannelTable
 import spam.blocker.db.NumberRegexTable
 import spam.blocker.db.RegexRule
 import spam.blocker.def.Def
 import spam.blocker.def.Def.DEFAULT_HANG_UP_DELAY
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_ANSWERED
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_API_QUERY
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_CARRIER_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_CNAP_REGEX
 import spam.blocker.def.Def.RESULT_ALLOWED_BY_CONTACT
+import spam.blocker.def.Def.RESULT_ALLOWED_BY_DEFAULT
+import spam.blocker.def.Def.RESULT_ALLOWED_BY_EMERGENCY_CALL
+import spam.blocker.def.Def.RESULT_ALLOWED_BY_EMERGENCY_SITUATION
+import spam.blocker.def.Def.RESULT_ALLOWED_BY_CNAP_REGEX
 import spam.blocker.def.Def.RESULT_ALLOWED_BY_CONTACT_GROUP_REGEX
 import spam.blocker.def.Def.RESULT_ALLOWED_BY_CONTACT_PREFIX_REGEX
 import spam.blocker.def.Def.RESULT_ALLOWED_BY_CONTACT_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_CONTENT_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_DATABASE_PREFIX_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_DEFAULT
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_DIALED
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_EMERGENCY_CALL
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_EMERGENCY_SITUATION
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_GEO_LOCATION_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_NAIVE_BAYES
 import spam.blocker.def.Def.RESULT_ALLOWED_BY_NUMBER_REGEX
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_OFF_TIME
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_PUSH_ALERT
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_RECENT_APP
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_REPEATED
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_SMS_ALERT
-import spam.blocker.def.Def.RESULT_ALLOWED_BY_STIR
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_API_QUERY
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_CARRIER_REGEX
 import spam.blocker.def.Def.RESULT_BLOCKED_BY_CNAP_REGEX
 import spam.blocker.def.Def.RESULT_BLOCKED_BY_CONTACT_GROUP_REGEX
 import spam.blocker.def.Def.RESULT_BLOCKED_BY_CONTACT_PREFIX_REGEX
 import spam.blocker.def.Def.RESULT_BLOCKED_BY_CONTACT_REGEX
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_CONTENT_REGEX
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_DATABASE_PREFIX_REGEX
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_GEO_LOCATION_REGEX
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_MEETING_MODE
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_NAIVE_BAYES
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_NON_CONTACT
 import spam.blocker.def.Def.RESULT_BLOCKED_BY_NUMBER_REGEX
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_SMS_BOMB
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_SPAM_DB
-import spam.blocker.def.Def.RESULT_BLOCKED_BY_STIR
-import spam.blocker.service.bot.ApiQueryResult
-import spam.blocker.service.bot.InterceptCall
-import spam.blocker.service.bot.InterceptSms
-import spam.blocker.ui.M
-import spam.blocker.ui.history.SingleReportSpamDialog
+import spam.blocker.def.Def.RESULT_BLOCKED_BY_NON_CONTACT
+import spam.blocker.def.Def.RESULT_ALLOWED_BY_DEFAULT
 import spam.blocker.ui.widgets.GreyText
-import spam.blocker.ui.widgets.ResIcon
-import spam.blocker.ui.widgets.RowVCenterSpaced
-import spam.blocker.ui.widgets.Str
-import spam.blocker.ui.widgets.StrokeButton
-import spam.blocker.util.A
-import spam.blocker.util.AppIcon
 import spam.blocker.util.Notification.ShowType
 import spam.blocker.util.Notification.missingChannel
 import spam.blocker.util.PermissiveJson
-import spam.blocker.util.Util.highlightMatchedText
 import spam.blocker.util.spf
-
-
-@Composable
-fun ExtraInfoWithDivider(text: AnnotatedString, maxLines: Int) {
-    val C = G.palette
-
-    if(text.isNotEmpty() && maxLines > 0) {
-        Column {
-            HorizontalDivider(
-                thickness = 0.5.dp,
-                color = C.disabled,
-                modifier = M.padding(top = 4.dp, bottom = 4.dp)
-            )
-            Text(
-                text = text,
-                color = C.textGrey,
-                fontSize = 16.sp,
-                lineHeight = 18.sp,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = maxLines
-            )
-        }
-    }
-}
 
 interface ICheckResult {
     val byType: Int
@@ -123,59 +51,6 @@ interface ICheckResult {
             fontSize = 16.sp,
             maxLines = if (expanded) 3 else 1,
         )
-    }
-
-    @Composable
-    fun ReportButtonRow(forType: Int, record: HistoryRecord) {
-        val ctx = LocalContext.current
-        val C = G.palette
-
-        // Report Number/SMS button
-        if (record.expanded) {
-            val enabledReportApis = remember {
-                G.apiReportVM.table.listAll(ctx).filter {
-                    it.enabled && when(forType) {
-                        Def.ForNumber -> it.actions.firstOrNull() is InterceptCall
-                        else -> it.actions.firstOrNull() is InterceptSms
-                    }
-                }
-            }
-            if (enabledReportApis.isNotEmpty()) {
-                Spacer(modifier = M.padding(vertical = 4.dp))
-
-                val reportTrigger = remember { mutableStateOf(false) }
-                SingleReportSpamDialog(trigger = reportTrigger, forType = forType, rawNumber = record.peer, smsContent = record.extraInfo, recordId = record.id)
-                StrokeButton(
-                    label = Str(if (forType == Def.ForNumber) R.string.report_number else R.string.report_sms),
-                    icon = { ResIcon(R.drawable.ic_upload_to_cloud, color = C.warning) },
-                    color = C.warning,
-                    modifier = M.padding(bottom = 4.dp)
-                ) {
-                    reportTrigger.value = true
-                }
-            }
-        }
-    }
-    // It will be displayed in the history card when expanded.
-    //  - show "Report Number/SMS" button
-    //  - show origin sms content for sms.
-    @Composable
-    fun ExpandedContent(forType: Int, record: HistoryRecord) {
-        val ctx = LocalContext.current
-
-        // Report Button
-        ReportButtonRow(forType, record)
-
-        // SMS content
-        if (forType == Def.ForSms) {
-            val smsContent = record.extraInfo
-            if (smsContent != null) {
-                ExtraInfoWithDivider(
-                    text = smsContent.A(),
-                    maxLines = if (record.expanded) Int.MAX_VALUE else spf.HistoryOptions(ctx).initialSmsRowCount,
-                )
-            }
-        }
     }
 
     fun shouldBlock(): Boolean {
@@ -197,21 +72,11 @@ interface ICheckResult {
         return spf.BlockType(ctx).type
     }
 
-    // The default notification channel for default call/sms, when it's not overridden by per rule type
+    // The default notification channel for blocked calls
     fun getNotificationChannel(ctx: Context, showType: ShowType): Channel {
-
         val spf = spf.Notification(ctx)
-
-        val channelId = when (showType) {
-            ShowType.SPAM_CALL -> spf.spamCallChannelId
-            ShowType.SPAM_SMS -> spf.spamSmsChannelId
-            ShowType.VALID_SMS -> spf.validSmsChannelId
-        }
-
-        val channel = ChannelTable.findByChannelId(ctx, channelId)
-            ?: missingChannel()
-
-        return channel
+        val channelId = spf.spamCallChannelId
+        return ChannelTable.findByChannelId(ctx, channelId) ?: missingChannel()
     }
 }
 
@@ -270,248 +135,26 @@ class ByNonContact(
 }
 
 
-// allowed by recent apps
-@Serializable
-class ByRecentApp(
-    private val pkgName: String,
-    override val byType: Int = RESULT_ALLOWED_BY_RECENT_APP,
-) : ICheckResult {
-
-    override fun reasonToDb(): String {
-        return pkgName
-    }
-
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.recent_apps)
-    }
-
-    @Composable
-    override fun ResultReason(expanded: Boolean) {
-        RowVCenterSpaced(4) {
-            super.ResultReason(expanded)
-            AppIcon(pkgName)
-        }
-    }
-}
-
-// blocked by meeting mode
-@Serializable
-class ByMeetingMode(
-    private val pkgName: String,
-    override val byType: Int = RESULT_BLOCKED_BY_MEETING_MODE,
-) : ICheckResult {
-
-    override fun reasonToDb(): String {
-        return pkgName
-    }
-
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.in_meeting)
-    }
-
-    @Composable
-    override fun ResultReason(expanded: Boolean) {
-        RowVCenterSpaced(4) {
-            super.ResultReason(expanded)
-            AppIcon(pkgName)
-        }
-    }
-}
-
-// allowed by repeated call
-@Serializable
-class ByRepeatedCall(
-    override val byType: Int = RESULT_ALLOWED_BY_REPEATED,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.repeated_call)
-    }
-}
-
-// allowed by dialed number
-@Serializable
-class ByDialedNumber(
-    override val byType: Int = RESULT_ALLOWED_BY_DIALED,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.dialed_number)
-    }
-}
-
-// allowed by answered number
-@Serializable
-class ByAnsweredNumber(
-    override val byType: Int = RESULT_ALLOWED_BY_ANSWERED,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.answered_number)
-    }
-}
-
-// allowed by off time
-@Serializable
-class ByOffTime(
-    override val byType: Int = RESULT_ALLOWED_BY_OFF_TIME,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.off_time)
-    }
-}
-
-// blocked by spam db
-@Serializable
-class BySpamDb(
-    // Because it checks both rawNumber and clearNumber(rawNumber), this value stores the matched one,
-    //  for later reporting purpose.
-    val matchedNumber: String,
-    override val byType: Int = RESULT_BLOCKED_BY_SPAM_DB,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.database)
-    }
-    override fun reasonToDb(): String {
-        return matchedNumber
-    }
-}
-
-// blocked/allowed by NaiveBias
-@Serializable
-class ByNaiveBayes(
-    override val byType: Int,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.local_ai)
-    }
-}
-
-// allowed/blocked by stir/shaken
-@Serializable
-class BySTIR(
-    override val byType: Int,
-    private val stirResult: Int,
-) : ICheckResult {
-    override fun reasonToDb(): String {
-        return stirResult.toString()
-    }
-
-    override fun resultReasonStr(ctx: Context): String {
-        return when (stirResult) {
-            Connection.VERIFICATION_STATUS_NOT_VERIFIED -> "${ctx.getString(R.string.stir_attestation)} ${
-                ctx.getString(
-                    R.string.unverified
-                )
-            }"
-
-            Connection.VERIFICATION_STATUS_PASSED -> "${ctx.getString(R.string.stir_attestation)} ${
-                ctx.getString(
-                    R.string.valid
-                )
-            }"
-
-            Connection.VERIFICATION_STATUS_FAILED -> "${ctx.getString(R.string.stir_attestation)} ${
-                ctx.getString(
-                    R.string.spoof
-                )
-            }"
-
-            else -> ctx.getString(R.string.stir_attestation)
-        }
-    }
-}
-
-// This will be serialized to a json and saved as the HistoryTable.reason
-@Serializable
-@SerialName("ApiQueryResultDetail")
-data class ApiQueryResultDetail(
-    val apiSummary: String, // apiSummary and category will be displayed on history card(2nd row)
-    val apiDomain: String, // for later reporting
-
-    val queryResult: ApiQueryResult, // the result of Action ApiQuery
-)
-
-// allowed/blocked by api query
-@Serializable
-class ByApiQuery(
-    override val byType: Int,
-    val detail: ApiQueryResultDetail,
-) : ICheckResult {
-    @Composable
-    override fun ExpandedContent(forType: Int, record: HistoryRecord) {
-        // "Report Number" button / show top line of SMS content
-        super.ExpandedContent(forType, record)
-
-        if (!record.expanded) {
-            return
-        }
-
-        // Server Echo
-//        val echo = detail.queryResult.serverEcho
-//        if (echo != null) {
-//            // pretty format the json
-//            val prettyEcho = try {
-//                PermissivePrettyJson.encodeToString(PermissiveJson.decodeFromString<JsonObject>(echo))
-//            } catch (_: Exception) {
-//                echo
-//            }
-//            ExtraInfoWithDivider(
-//                text = prettyEcho.A(),
-//                maxLines = 20,
-//            )
-//        }
-    }
-
-    override fun reasonToDb(): String {
-        return PermissiveJson.encodeToString(detail)
-    }
-
-    override fun resultReasonStr(ctx: Context): String {
-        val category = if (detail.queryResult.category?.isNotEmpty() == true)
-            " (${detail.queryResult.category})"
-        else
-            ""
-        val comment = if (detail.queryResult.comment?.isNotEmpty() == true)
-            " : ${detail.queryResult.comment}"
-        else
-            ""
-
-        return ctx.getString(R.string.query) + ": " + detail.apiSummary + category + comment
-    }
-}
-
-// allowed/blocked by regex rule
+// allowed/blocked by a regex rule
 @Serializable
 class ByRegexRule(
     override val byType: Int,
-    val rule: RegexRule?, // null: the rule is deleted
+    val rule: RegexRule? = null, // null: the rule has been deleted
     val details: String? = null,
 ) : ICheckResult {
 
-    // This is saved in history log db
     @Serializable
     data class DbData(
         val ruleId: Long,
-        val details: String?
+        val details: String? = null,
     )
 
     override fun reasonToDb(): String {
-        val ruleId = rule?.id ?: 0
-        return Json.encodeToString(
-            DbData(ruleId, details)
-        )
-    }
-
-    private fun ruleSummary(ctx: Context): String {
-        val reasonStr = if (rule != null) {
-            if (rule.description != "") rule.description else rule.patternStr()
-        } else {
-            ctx.resources.getString(R.string.deleted_filter)
-        }
-        return reasonStr
+        return Json.encodeToString(DbData(rule?.id ?: 0, details))
     }
 
     override fun getBlockType(ctx: Context): Int {
-        return rule?.blockType // per rule setting
-            ?: super.getBlockType(ctx) // fallback to global setting
+        return rule?.blockType ?: super.getBlockType(ctx)
     }
 
     override fun hangUpDelay(ctx: Context): Int {
@@ -519,151 +162,39 @@ class ByRegexRule(
     }
 
     override fun getNotificationChannel(ctx: Context, showType: ShowType): Channel {
-        if (rule == null) { // rule deleted?
-            return super.getNotificationChannel(ctx, showType) // fallback to global setting
-        }
-
-        return ChannelTable.findByChannelId(ctx, rule.channel)
-            ?: missingChannel()
-    }
-
-    // Highlight keywords that blocked the SMS (if it's blocked by content regex rule)
-    @Composable
-    override fun ExpandedContent(forType: Int, record: HistoryRecord) {
-        val ctx = LocalContext.current
-        val C = G.palette
-
-        when(forType) {
-            Def.ForSms -> {
-                val smsContent = record.extraInfo
-                val isBySmsRule = byType in listOf(
-                    RESULT_ALLOWED_BY_CONTENT_REGEX,
-                    RESULT_BLOCKED_BY_CONTENT_REGEX
-                )
-
-                if (smsContent != null && isBySmsRule && rule != null) {
-                    // Report Button
-                    ReportButtonRow(forType, record)
-
-                    // SMS content
-                    ExtraInfoWithDivider(
-                        text = highlightMatchedText(
-                            text = smsContent,
-                            regexStr = rule.pattern,
-                            regexFlags = rule.patternFlags,
-                            wildcardColor = if(rule.isBlacklist) C.error else C.success,
-                            textColor = C.textGrey
-                        ),
-                        maxLines = if (record.expanded) Int.MAX_VALUE else spf.HistoryOptions(ctx).initialSmsRowCount,
-                    )
-                } else {
-                    super.ExpandedContent(forType, record)
-                }
-            }
-            else -> super.ExpandedContent(forType, record)
-        }
+        if (rule == null) return super.getNotificationChannel(ctx, showType)
+        return ChannelTable.findByChannelId(ctx, rule.channel) ?: missingChannel()
     }
 
     override fun resultReasonStr(ctx: Context): String {
-        val summary = ruleSummary(ctx)
+        val summary = if (rule != null) {
+            if (rule.description != "") rule.description else rule.patternStr()
+        } else {
+            ctx.resources.getString(R.string.deleted_filter)
+        }
 
         return when (byType) {
-            RESULT_ALLOWED_BY_NUMBER_REGEX, RESULT_BLOCKED_BY_NUMBER_REGEX -> ctx.getString(R.string.regex_pattern) + ": $summary"
-            RESULT_ALLOWED_BY_CONTACT_GROUP_REGEX, RESULT_BLOCKED_BY_CONTACT_GROUP_REGEX -> {
+            RESULT_ALLOWED_BY_NUMBER_REGEX, RESULT_BLOCKED_BY_NUMBER_REGEX ->
+                ctx.getString(R.string.regex_pattern) + ": $summary"
+
+            RESULT_ALLOWED_BY_CONTACT_GROUP_REGEX, RESULT_BLOCKED_BY_CONTACT_GROUP_REGEX ->
                 ctx.getString(R.string.contact_group) + ": $summary"
-            }
 
-            RESULT_ALLOWED_BY_CONTACT_REGEX, RESULT_BLOCKED_BY_CONTACT_REGEX -> {
+            RESULT_ALLOWED_BY_CONTACT_REGEX, RESULT_BLOCKED_BY_CONTACT_REGEX ->
                 ctx.getString(R.string.contact_rule) + ": $summary"
-            }
 
-            RESULT_ALLOWED_BY_CONTENT_REGEX, RESULT_BLOCKED_BY_CONTENT_REGEX -> {
-                ctx.getString(R.string.content) + ": $summary"
-            }
-
-            RESULT_ALLOWED_BY_CNAP_REGEX, RESULT_BLOCKED_BY_CNAP_REGEX -> {
+            RESULT_ALLOWED_BY_CNAP_REGEX, RESULT_BLOCKED_BY_CNAP_REGEX ->
                 ctx.getString(R.string.caller_name) + ": $summary"
-            }
 
-            RESULT_ALLOWED_BY_GEO_LOCATION_REGEX, RESULT_BLOCKED_BY_GEO_LOCATION_REGEX -> {
-                ctx.getString(R.string.geolocation) + ": $summary"
-            }
-            RESULT_ALLOWED_BY_CARRIER_REGEX, RESULT_BLOCKED_BY_CARRIER_REGEX -> {
-                ctx.getString(R.string.carrier) + ": $summary"
-            }
+            RESULT_ALLOWED_BY_CONTACT_PREFIX_REGEX, RESULT_BLOCKED_BY_CONTACT_PREFIX_REGEX ->
+                ctx.getString(R.string.contact_prefix) + ": $details"
 
-            RESULT_ALLOWED_BY_CONTACT_PREFIX_REGEX, RESULT_BLOCKED_BY_CONTACT_PREFIX_REGEX -> {
-                // No need to add $summary here, usually there'll be only 1 contact prefix regex enabled
-                ctx.getString(R.string.contact_prefix) + ": $details" // details == contact name
-            }
-            RESULT_ALLOWED_BY_DATABASE_PREFIX_REGEX, RESULT_BLOCKED_BY_DATABASE_PREFIX_REGEX -> {
-                // No need to add $summary here, usually there'll be only 1 contact prefix regex enabled
-                ctx.getString(R.string.database_prefix) + ": $details" // details == db number
-            }
-
-            else -> "bug, please report"
+            else -> ctx.getString(R.string.regex_pattern) + ": $summary"
         }
     }
 }
 
-// This will be serialized to a json and saved as the HistoryTable.reason
-@Serializable
-@SerialName("PushAlertDetail")
-data class PushAlertDetail(
-    val pkgName: String,
-    val body: String,
-)
-// allowed by push alert
-@Serializable
-class ByPushAlert(
-    override val byType: Int = RESULT_ALLOWED_BY_PUSH_ALERT,
-    val detail: PushAlertDetail,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.push_alert)
-    }
-    override fun reasonToDb(): String {
-        return PermissiveJson.encodeToString(detail)
-    }
-    @Composable
-    override fun ResultReason(expanded: Boolean) {
-        RowVCenterSpaced(4) {
-            super.ResultReason(expanded)
-            AppIcon(detail.pkgName)
-        }
-    }
-    @Composable
-    override fun ExpandedContent(forType: Int, record: HistoryRecord) {
-        super.ExpandedContent(forType, record)
-        if (record.expanded)
-            ExtraInfoWithDivider(
-                text = detail.body.A(),
-                maxLines = 20,
-            )
-    }
-}
-
-// allowed by sms alert
-@Serializable
-class BySmsAlert(
-    override val byType: Int = RESULT_ALLOWED_BY_SMS_ALERT,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.sms_alert)
-    }
-}
-
-// blocked by sms bomb
-@Serializable
-class BySmsBomb(
-    override val byType: Int = RESULT_BLOCKED_BY_SMS_BOMB,
-) : ICheckResult {
-    override fun resultReasonStr(ctx: Context): String {
-        return ctx.getString(R.string.sms_bomb)
-    }
-}
-
-// TODO: simplify this
+// Rebuild the check result from the history record
 fun parseCheckResultFromDb(ctx: Context, result: Int, reason: String): ICheckResult {
     return when (result) {
         RESULT_ALLOWED_BY_EMERGENCY_CALL -> ByEmergencyCall()
@@ -674,65 +205,19 @@ fun parseCheckResultFromDb(ctx: Context, result: Int, reason: String): ICheckRes
         )
         RESULT_BLOCKED_BY_NON_CONTACT -> ByNonContact()
 
-        RESULT_ALLOWED_BY_STIR, RESULT_BLOCKED_BY_STIR -> BySTIR(result, reason.toInt())
-        RESULT_ALLOWED_BY_RECENT_APP -> ByRecentApp(reason)
-        RESULT_BLOCKED_BY_MEETING_MODE -> ByMeetingMode(reason)
-        RESULT_ALLOWED_BY_REPEATED -> ByRepeatedCall()
-        RESULT_ALLOWED_BY_DIALED -> ByDialedNumber()
-        RESULT_ALLOWED_BY_ANSWERED -> ByAnsweredNumber()
-        RESULT_ALLOWED_BY_OFF_TIME -> ByOffTime()
-        RESULT_BLOCKED_BY_SPAM_DB -> BySpamDb(matchedNumber = reason)
-        RESULT_BLOCKED_BY_API_QUERY, RESULT_ALLOWED_BY_API_QUERY -> {
-            val extraInfo = PermissiveJson.decodeFromString<ApiQueryResultDetail>(reason)
-            ByApiQuery(result, extraInfo)
-        }
-
         RESULT_ALLOWED_BY_NUMBER_REGEX, RESULT_BLOCKED_BY_NUMBER_REGEX,
-        RESULT_ALLOWED_BY_CONTACT_GROUP_REGEX, RESULT_BLOCKED_BY_CONTACT_GROUP_REGEX,
-        RESULT_ALLOWED_BY_CONTACT_REGEX, RESULT_BLOCKED_BY_CONTACT_REGEX,
         RESULT_ALLOWED_BY_CNAP_REGEX, RESULT_BLOCKED_BY_CNAP_REGEX,
-        RESULT_ALLOWED_BY_GEO_LOCATION_REGEX, RESULT_BLOCKED_BY_GEO_LOCATION_REGEX,
-        RESULT_ALLOWED_BY_CARRIER_REGEX, RESULT_BLOCKED_BY_CARRIER_REGEX,
-        RESULT_ALLOWED_BY_CONTACT_PREFIX_REGEX, RESULT_BLOCKED_BY_CONTACT_PREFIX_REGEX,
-        RESULT_ALLOWED_BY_DATABASE_PREFIX_REGEX, RESULT_BLOCKED_BY_DATABASE_PREFIX_REGEX -> {
-            try {
-                // try new format, `reason` is a json string like: {"ruleId": 123, "details": "..."}
-                val data = Json.decodeFromString<ByRegexRule.DbData>(reason)
-                val rule = NumberRegexTable().findById(ctx, data.ruleId)
-
-                ByRegexRule(result, rule, data.details)
-            } catch (_: Exception) {
-                // old format, `reason` is the ruleId
-                //  TODO: Remove this compatibility check after 2028-06-01
-                val ruleId = reason.toLong()
-                val rule = NumberRegexTable().findById(ctx, ruleId)
-                ByRegexRule(result, rule)
+        RESULT_ALLOWED_BY_CONTACT_REGEX, RESULT_BLOCKED_BY_CONTACT_REGEX,
+        RESULT_ALLOWED_BY_CONTACT_GROUP_REGEX, RESULT_BLOCKED_BY_CONTACT_GROUP_REGEX,
+        RESULT_ALLOWED_BY_CONTACT_PREFIX_REGEX, RESULT_BLOCKED_BY_CONTACT_PREFIX_REGEX -> {
+            val dbData = runCatching {
+                PermissiveJson.decodeFromString<ByRegexRule.DbData>(reason)
+            }.getOrNull()
+            val rule = dbData?.ruleId?.let { id ->
+                NumberRegexTable().listAll(ctx).firstOrNull { it.id == id }
             }
+            ByRegexRule(byType = result, rule = rule, details = dbData?.details)
         }
-        RESULT_ALLOWED_BY_NAIVE_BAYES, RESULT_BLOCKED_BY_NAIVE_BAYES -> {
-            ByNaiveBayes(result)
-        }
-
-        RESULT_ALLOWED_BY_CONTENT_REGEX, RESULT_BLOCKED_BY_CONTENT_REGEX -> {
-            try {
-                // try new format, `reason` is a json string like: {"ruleId": 123, "details": "..."}
-                val data = Json.decodeFromString<ByRegexRule.DbData>(reason)
-                val rule = ContentRegexTable().findById(ctx, data.ruleId)
-
-                ByRegexRule(result, rule, data.details)
-            } catch (_: Exception) {
-                // old format, `reason` is the ruleId
-                //  TODO: Remove this compatibility check after 2028-06-01
-                val rule = ContentRegexTable().findById(ctx, reason.toLong())
-                ByRegexRule(result, rule)
-            }
-        }
-        RESULT_ALLOWED_BY_PUSH_ALERT -> {
-            val detail = PermissiveJson.decodeFromString<PushAlertDetail>(reason)
-            ByPushAlert(detail = detail)
-        }
-        RESULT_ALLOWED_BY_SMS_ALERT -> BySmsAlert()
-        RESULT_BLOCKED_BY_SMS_BOMB -> BySmsBomb()
 
         else -> ByDefault(result)
     }

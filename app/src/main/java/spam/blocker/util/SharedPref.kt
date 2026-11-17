@@ -15,8 +15,6 @@ import spam.blocker.db.Notification.CHANNEL_HIGH_MUTED
 import spam.blocker.db.Notification.CHANNEL_LOW
 import spam.blocker.def.Def
 import spam.blocker.def.Def.DEFAULT_HANG_UP_DELAY
-import spam.blocker.ui.setting.api.PhoneBlock
-import spam.blocker.ui.setting.quick.Bayes
 import spam.blocker.ui.setting.quick.DefaultCallerIdBgColor
 import spam.blocker.ui.setting.quick.DefaultCallerIdTemplate
 import spam.blocker.ui.theme.Black1E1E1E
@@ -187,8 +185,6 @@ class spf { // for namespace only
         var isGloballyEnabled by bool("globally_enable")
         var isCollapsed by bool("global_enable_collapsed", true)
         var isCallEnabled by bool("call_enable")
-        var isSmsEnabled by bool("sms_enable")
-        var isMmsEnabled by bool("mms_enable")
 
         var language by str("language")
 
@@ -198,7 +194,6 @@ class spf { // for namespace only
         var activeTab by str("active_tab", "setting")
 
         var hasPromptedForRunningInWorkProfile by bool("warn_running_in_work_profile_once")
-        var isDoubleSMSWarningDismissed by bool("warn_double_sms")
         var ignorePriorityConflict by bool("ignore_priority_conflict")
     }
 
@@ -206,9 +201,6 @@ class spf { // for namespace only
         var isScreeningSectionCollapsed by bool("screening_section_collapsed")
         var isQuickSettingsCollapsed by bool("quick_settings_collapsed")
         var isRegexSettingsCollapsed by bool("regex_settings_collapsed")
-        var isInstantQueryCollapsed by bool("instant_query_collapsed")
-        var isReportNumberCollapsed by bool("report_number_collapsed")
-        var isAutomationCollapsed by bool("automation_collapsed")
         var isMiscCollapsed by bool("miscellaneous_collapsed")
     }
 
@@ -230,39 +222,6 @@ class spf { // for namespace only
         var timestamp by long("emergency_last_timestamp")
     }
 
-    class RegexOptions(ctx: Context) : SharedPref(ctx) {
-        var isNumberCollapsed by bool("number_rule_collapsed")
-        var isContentCollapsed by bool("content_rule_collapsed")
-        var isQuickCopyCollapsed by bool("quick_copy_rule_collapsed")
-
-        var maxNoneScrollRows by int("rule_list_max_none_scroll_rows", 10)
-        var maxRegexRows by int("rule_max_regex_rows", 3)
-        var maxDescRows by int("rule_max_description_rows", 2)
-        var ruleListHeightPercentage by int("rule_list_height_percentage", 60)
-        var textboxLimit by int("rule_textbox_max_char_limit", 10000)
-    }
-
-    class BotOptions(ctx: Context) : SharedPref(ctx) {
-        var isListCollapsed by bool("bot_list_collapsed")
-
-        fun key(tileIndex: Int): String {
-            return "custom_tile_enabled_$tileIndex"
-        }
-        fun isDynamicTileEnabled(tileIndex: Int): Boolean {
-            return prefs.getBoolean(key(tileIndex), false)
-        }
-        fun setDynamicTileEnabled(tileIndex: Int, enabled: Boolean) {
-            prefs.edit { putBoolean(key(tileIndex), enabled) }
-        }
-    }
-    class ApiQueryOptions(ctx: Context) : SharedPref(ctx) {
-        var isListCollapsed by bool("api_query_list_collapsed")
-        var priority by int("api_query_priority", -1)
-    }
-    class ApiReportOptions(ctx: Context) : SharedPref(ctx) {
-        var isListCollapsed by bool("api_report_list_collapsed")
-    }
-
     class HistoryOptions(ctx: Context) : SharedPref(ctx) {
         var showPassed by bool("show_passed", true)
         var showBlocked by bool("show_blocked", true)
@@ -274,9 +233,6 @@ class spf { // for namespace only
         var isLoggingEnabled by bool("history_logging_enabled", true)
         var isExpiryEnabled by bool("history_expiry_enabled")
         var ttl by int("history_ttl_days", 14) // 14 days
-
-        var isLogSmsContentEnabled by bool("log_sms_content", true)
-        var initialSmsRowCount by int("initial_sms_row_count", 2)
 
         var searchOnlineUrl by str("search_online_url", "https://google.com/search?q={raw_number}")
 
@@ -301,62 +257,15 @@ class spf { // for namespace only
         }
     }
 
-    class Stir(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("stir_enabled")
-        var isIncludeUnverified by bool("stir_include_unverified")
-        var priority by int("stir_strict_priority")
-    }
-
-    class SpamDB(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("spam_db_enabled")
-        var isExpiryEnabled by bool("spam_db_expiry_enabled")
-        var priority by int("spam_db_priority")
-        var ttl by int("spam_db_ttl_days", 180) // 180 days
-    }
-    class NaiveBayes(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("naive_bayes_enabled")
-        var priorityHam by int("naive_bayes_ham_priority", Bayes.Default_Priority_Ham)
-        var prioritySpam by int("naive_bayes_spam_priority", Bayes.Default_Priority_Spam)
-        var threshold by float("naive_bayes_threshold", Bayes.Default_Threshold)
-    }
-
     class Contact(ctx: Context) : SharedPref(ctx) {
         var isEnabled by bool("contacts_permitted")
         var isStrict by bool("contacts_exclusive")
         var lenientPriority by int("contacts_lenient_priority", 10)
         var strictPriority by int("contacts_strict_priority")
     }
-    class RepeatedCall(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("permit_repeated")
-        var isSmsEnabled by bool("permit_repeated_by_sms", true)
 
-        var times by int("repeated_times", 1)
-        var maxInterval by int("repeated_in_x_min", 5)
-        var minInterval by int("repeated_min_interval", 0)
-    }
-
-    class Dialed(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("permit_dialed")
-        var isSmsEnabled by bool("permit_dialed_by_sms", true)
-        var always by bool("permit_dialed_always", false)
-        var days by int("dialed_in_x_day", 7)
-    }
-
-    class Answered(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("permit_answered")
-        var isWarningAcknowledged by bool("answered_warning_acknowledged")
-        var minDuration by int("answered_min_duration", 15)
-        var days by int("answered_in_x_day", 7)
-    }
-
-    class OffTime(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("off_time")
-
-        var startHour by int("off_time_start_hour")
-        var endHour by int("off_time_end_hour")
-
-        var startMin by int("off_time_start_min")
-        var endMin by int("off_time_end_min")
+    class Notification(ctx: Context) : SharedPref(ctx) {
+        var spamCallChannelId by str("channel_spam_call", CHANNEL_LOW)
     }
 
     class BlockType(ctx: Context) : SharedPref(ctx) {
@@ -364,11 +273,14 @@ class spf { // for namespace only
         var delay by str("block_type_config")
     }
 
-    class Notification(ctx: Context) : SharedPref(ctx) {
-        var spamCallChannelId by str("channel_spam_call", CHANNEL_LOW)
-        var spamSmsChannelId by str("channel_spam_sms", CHANNEL_LOW)
-        var validSmsChannelId by str("channel_valid_sms", CHANNEL_HIGH)
-        var smsChatChannelId by str("channel_active_sms_chat", CHANNEL_HIGH_MUTED)
+    class RegexOptions(ctx: Context) : SharedPref(ctx) {
+        var isNumberCollapsed by bool("number_rule_collapsed")
+
+        var maxNoneScrollRows by int("rule_list_max_none_scroll_rows", 10)
+        var maxRegexRows by int("rule_max_regex_rows", 3)
+        var maxDescRows by int("rule_max_description_rows", 2)
+        var ruleListHeightPercentage by int("rule_list_height_percentage", 60)
+        var textboxLimit by int("rule_textbox_max_char_limit", 10000)
     }
 
     class CallerID(ctx: Context) : SharedPref(ctx) {
@@ -377,171 +289,5 @@ class spf { // for namespace only
         var y by int("caller_id_window_y")
         var bgColor by int("caller_id_bg_color", DefaultCallerIdBgColor)
         var template by str("caller_id_template", DefaultCallerIdTemplate)
-    }
-
-    @Serializable
-    data class RecentAppInfo(
-        var pkgName: String,
-        var duration: Int? = null
-    ) {
-        override fun toString(): String {
-            return if (duration == null) {
-                pkgName
-            } else {
-                "$pkgName@$duration"
-            }
-        }
-        companion object {
-            fun fromString(str: String) : RecentAppInfo {
-                val parts = str.split("@")
-                return RecentAppInfo(
-                    pkgName = parts[0],
-                    duration = parts.getOrNull(1)?.toIntOrNull()
-                )
-            }
-        }
-    }
-    class RecentApps(ctx: Context) : SharedPref(ctx) {
-        var appList by str("recent_apps")
-
-        fun getList(): List<RecentAppInfo> {
-            // pkg.a,pkg.b@20,pkg.c
-            val s = appList
-
-            if (s == "")
-                return listOf()
-
-            return s.split(",").map {
-                RecentAppInfo.fromString(it)
-            }
-        }
-        fun setList(list: List<RecentAppInfo>) {
-            appList = list.joinToString(",") {
-                it.toString()
-            }
-        }
-        fun addPackage(pkgToAdd: String) {
-            val l = getList().toMutableList()
-            l.add(RecentAppInfo(pkgToAdd, null))
-            setList(l)
-        }
-        fun removePackage(pkgToRemove: String) {
-            val l = getList().toMutableList()
-            val index = l.indexOfFirst {
-                it.pkgName == pkgToRemove
-            }
-            if (index != -1) {
-                l.removeAt(index)
-            }
-            setList(l)
-        }
-
-        var inXMin by int("recent_app_in_x_min", 5)
-    }
-
-    /*
-    Each item is: package name followed by a list of banned foreground service names, which
-     is separated by a ;
-    E.g.:
-     com.pkg.A
-     com.pkg.B@fgServiceName1;fgServiceName2
-
-    They will be concatenated into a string with separator, and saved in the shared pref.
-    E.g.:
-     com.pkg.A,com.pkg.B@fgServiceName1;fgServiceName2
-     */
-    @Serializable
-    data class MeetingAppInfo(
-        var pkgName: String,
-        var exclusions: List<String> = listOf()
-    ) {
-        override fun toString(): String {
-            return if (exclusions.isEmpty()) {
-                pkgName
-            } else {
-                "$pkgName@${exclusions.joinToString(";")}"
-            }
-        }
-        companion object {
-            fun fromString(str: String) : MeetingAppInfo {
-                return if (!str.contains("@"))
-                    MeetingAppInfo(
-                        pkgName = str,
-                    )
-                else
-                    MeetingAppInfo(
-                        pkgName = str.substringBefore("@"),
-                        exclusions = str.substringAfter("@").split(";").filter { it.isNotEmpty() }
-                    )
-            }
-        }
-    }
-    class MeetingMode(ctx: Context) : SharedPref(ctx) {
-        var appList by str("meeting_apps")
-
-        fun getList(): List<MeetingAppInfo> {
-            val s = appList
-
-            if (s == "")
-                return listOf()
-
-            val x = s.split(",").map {
-                MeetingAppInfo.fromString(it)
-            }
-            return x
-        }
-        fun setList(list: List<MeetingAppInfo>) {
-            val x = list.joinToString(",") {
-                it.toString()
-            }
-            appList = x
-        }
-        fun addPackage(pkgToAdd: String) {
-            val l = getList().toMutableList()
-            l.add(MeetingAppInfo(pkgToAdd))
-            setList(l)
-        }
-        fun removePackage(pkgToRemove: String) {
-            val l = getList().toMutableList()
-            val index = l.indexOfFirst {
-                it.pkgName == pkgToRemove
-            }
-            if (index != -1) {
-                l.removeAt(index)
-            }
-            setList(l)
-        }
-
-        var priority by int("meeting_mode_priority", 20)
-    }
-
-    class SmsAlert(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("call_alert_enabled")
-        var isCollapsed by bool("call_alert_collapsed")
-        var duration by int("call_alert_duration", 90)
-        var regexStr by str("call_alert_regex_str")
-        var regexFlags by int("call_alert_regex_flags", Def.DefaultRegexFlags)
-        var timestamp by long("call_alert_timestamp", 0)
-    }
-
-    class PushAlert(ctx: Context) : SharedPref(ctx) {
-        var isCollapsed by bool("push_alert_collapsed")
-        var pkgName by str("push_alert_pkg_name")
-        var body by str("push_alert_body")
-        var expireTime by long("push_alert_expire_time")
-    }
-
-    class SmsBomb(ctx: Context) : SharedPref(ctx) {
-        var isEnabled by bool("sms_bomb_enabled")
-        var isCollapsed by bool("sms_bomb_collapsed")
-        var interval by int("sms_bomb_interval", 30)
-        var regexStr by str("sms_bomb_regex_str")
-        var regexFlags by int("sms_bomb_regex_flags", Def.DefaultRegexFlags)
-        var timestamp by long("sms_bomb_timestamp")
-        var isLockScreenProtectionEnabled by bool("sms_bomb_lockscreen_protection_enabled", true)
-    }
-
-    class OAuth(ctx: Context) : SharedPref(ctx) {
-        var phoneBlockToken by str(PhoneBlock.spfTokenKey)
     }
 }

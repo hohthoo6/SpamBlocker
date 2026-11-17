@@ -13,31 +13,24 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import spam.blocker.Events
-import spam.blocker.db.BotTable
 import spam.blocker.db.CallTable
-import spam.blocker.db.HistoryRecord
 import spam.blocker.def.Def
-import spam.blocker.service.bot.ActionContext
-import spam.blocker.service.bot.PostCallScreening
-import spam.blocker.service.bot.Ringtone
-import spam.blocker.service.bot.executeAll
+import spam.blocker.db.HistoryRecord
 import spam.blocker.service.checker.Checker
 import spam.blocker.service.checker.ICheckResult
-import spam.blocker.service.reporting.maybeAutoReportCall
 import spam.blocker.ui.NotificationTrampolineActivity
 import spam.blocker.ui.setting.quick.showCallerIdWindow
 import spam.blocker.util.Contacts
 import spam.blocker.util.ILogger
 import spam.blocker.util.Notification
 import spam.blocker.util.Notification.ShowType
-import spam.blocker.util.RingtoneUtil
 import spam.blocker.util.SaveableLogger
 import spam.blocker.util.SimUtils
 import spam.blocker.util.Util
+import spam.blocker.util.spf
 import spam.blocker.util.Util.numberCarrier
 import spam.blocker.util.Util.numberGeoLocation
 import spam.blocker.util.logi
-import spam.blocker.util.spf
 
 fun Details.getRawNumber(): String {
     var rawNumber = ""
@@ -174,9 +167,7 @@ class CallScreeningService : CallScreeningService() {
                 else -> reject(details)
             }
         } else {
-            // 1. Set ringtone + pass()
-            val shouldMute = setRingtone(ctx, r)
-            pass(details, shouldMute)
+            pass(details)
         }
         logi("doScreenCall() finished")
     }
@@ -189,32 +180,6 @@ class CallScreeningService : CallScreeningService() {
             if (Util.isEmergencyNumber(ctx, rawNumber) || extraNumbers.contains(rawNumber)) {
                 spf.timestamp = System.currentTimeMillis()
             }
-        }
-
-        // Return value: should mute or not
-        //  true -> mute the ringtone
-        //  false -> play the ringtone
-        private fun setRingtone(ctx: Context, r: ICheckResult) : Boolean {
-            // 1. Get all workflows that are linked to this regex rule
-            val bots = BotTable.listAll(ctx).filter {
-                it.trigger is Ringtone
-            }
-            if (bots.isEmpty())
-                return false
-
-            // 2. Save the current ringtone to shared prefs
-            val current = RingtoneUtil.getCurrent(ctx)
-            spf.Temporary(ctx).ringtone = current.toString()
-
-            // 3. Change the system default ringtone, it will be reset after 2 seconds
-            var shouldMute = false
-            bots.forEach { bot ->
-                val aCtx = ActionContext(checkResult = r, botId = bot.id)
-                bot.triggerAndActions().executeAll(ctx, aCtx)
-                shouldMute = aCtx.shouldMute
-            }
-
-            return shouldMute
         }
 
         // Returns the new recordId, null if logging is disabled.
@@ -251,10 +216,6 @@ class CallScreeningService : CallScreeningService() {
                 putExtra("blocked", true)
             }.setAction("action_call")
 
-            val toCopy = Checker.checkQuickCopy(
-                ctx, rawNumber, null, true, true
-            )
-
 
             Notification.show(
                 ctx,
@@ -263,7 +224,7 @@ class CallScreeningService : CallScreeningService() {
                 title = Contacts.findContactByRawNumber(ctx, rawNumber)?.name ?: rawNumber,
                 body = r.resultReasonStr(ctx),
                 intent = intent,
-                toCopy = toCopy
+                toCopy = listOf()
             )
         }
 
@@ -291,8 +252,6 @@ class CallScreeningService : CallScreeningService() {
                     // 2. Show notification
                     showSpamNotification(ctx, r, rawNumber)
 
-                    // 3. Report spam number
-                    maybeAutoReportCall(ctx, r, recordId, rawNumber, isTest)
                 } else { // allowed
                     // 4. Show CallerID window
                     withContext(Main) {
@@ -304,18 +263,6 @@ class CallScreeningService : CallScreeningService() {
                                 carrier = numberCarrier(ctx, rawNumber)
                             )
                         }
-                    }
-                }
-
-                // 5. Run post screening workflows
-                run {
-                    val bots = BotTable.listAll(ctx).filter {
-                        it.trigger is PostCallScreening && it.trigger.isActivated()
-                    }
-
-                    bots.forEach { bot ->
-                        val aCtx = ActionContext(rawNumber = rawNumber, checkResult = r, logger = logger)
-                        bot.triggerAndActions().executeAll(ctx, aCtx)
                     }
                 }
             }

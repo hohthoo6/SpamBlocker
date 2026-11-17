@@ -20,7 +20,6 @@ import android.os.Build
 import android.os.LocaleList
 import android.os.PowerManager
 import android.os.UserManager
-import android.provider.CalendarContract
 import android.provider.CallLog.Calls
 import android.provider.DocumentsContract
 import android.provider.Settings
@@ -914,119 +913,6 @@ object Util {
                     }
                 }
             }
-    }
-
-    class SmsInfo(
-        val rawNumber: String,
-//        val type: Int, // sent, ...
-        val content: String,
-        val time: Long,
-    )
-    fun getHistorySMSes(
-        ctx: Context,
-        direction: Int, // Def.DIRECTION_INCOMING, Def.DIRECTION_OUTGOING
-        withinMillis: Long,
-        limit: Int? = null,
-    ): List<SmsInfo> {
-        val selection = mutableListOf(
-            "${Sms.DATE} >= ${Now.currentMillis() - withinMillis}"
-        )
-
-        if (direction == Def.DIRECTION_INCOMING) {
-            selection.add(
-                "${Sms.TYPE} = ${Sms.MESSAGE_TYPE_INBOX}"
-            )
-        } else {
-            selection.add(
-                "${Sms.TYPE} IN (${Sms.MESSAGE_TYPE_SENT}, ${Sms.MESSAGE_TYPE_OUTBOX}, ${Sms.MESSAGE_TYPE_FAILED})"
-            )
-        }
-
-        val projection = mutableListOf(Sms.ADDRESS, Sms.BODY, Sms.DATE)
-
-        val sortOrder = limit?.let { "${Sms.DATE} DESC LIMIT $it" }
-
-        val ret = mutableListOf<SmsInfo>()
-        try {
-            ctx.contentResolver.query(
-                Sms.CONTENT_URI,
-                projection.toTypedArray(),
-                selection.joinToString(" AND "),
-                null,
-                sortOrder
-            )?.use {
-                if (it.moveToFirst()) {
-                    do {
-                        val messagedNumber = it.getStringOrNull(0) ?: ""
-                        val content = it.getStringOrNull(1) ?: ""
-                        val time = it.getLongOrNull(2) ?: 0L
-                        ret += SmsInfo(rawNumber = messagedNumber, content = content, time = time)
-
-                    } while (it.moveToNext())
-                }
-            }
-        } catch (ignore: Exception) {
-        }
-        return ret
-    }
-    fun countHistorySMSByNumber(
-        ctx: Context,
-        phoneNumber: PhoneNumber,
-        direction: Int, // Def.DIRECTION_INCOMING, Def.DIRECTION_OUTGOING
-        withinMillis: Long
-    ): Int {
-        return getHistorySMSes(ctx, direction, withinMillis).filter {
-            phoneNumber.isSame(it.rawNumber)
-        }.size
-    }
-
-    fun ongoingCalendarEvents(ctx: Context) : List<String> {
-        if (!Permission.calendar.isGranted)
-            return listOf()
-        val contentResolver = ctx.contentResolver
-        val currentTime = System.currentTimeMillis()
-        val timeBuffer = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
-
-        // Define the projection (columns to retrieve)
-        val projection = arrayOf(
-//            CalendarContract.Events._ID,
-            CalendarContract.Events.TITLE,
-            CalendarContract.Events.DTSTART,
-            CalendarContract.Events.DTEND
-        )
-
-        // Query events within a time range (e.g., from now to 24 hours ago/forward)
-        val selection = "${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DTEND} >= ?"
-        val selectionArgs = arrayOf(
-            (currentTime + timeBuffer).toString(),
-            (currentTime - timeBuffer).toString()
-        )
-
-        val cursor: Cursor? = contentResolver.query(
-            CalendarContract.Events.CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            null
-        )
-
-        // List to store ongoing events
-        val ongoingEvents = mutableListOf<String>()
-
-        cursor?.use {
-            while (it.moveToNext()) {
-//                val eventId = it.getLong(it.getColumnIndexOrThrow(CalendarContract.Events._ID))
-                val title = it.getString(it.getColumnIndexOrThrow(CalendarContract.Events.TITLE))
-                val startTime = it.getLong(it.getColumnIndexOrThrow(CalendarContract.Events.DTSTART))
-                val endTime = it.getLong(it.getColumnIndexOrThrow(CalendarContract.Events.DTEND))
-
-                // Check if current time is between startTime and endTime
-                if (currentTime in startTime..endTime) {
-                    ongoingEvents.add(title)
-                }
-            }
-        }
-        return ongoingEvents
     }
 
     fun isInCall(ctx: Context): Boolean {

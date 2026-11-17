@@ -35,9 +35,6 @@ import spam.blocker.config.Category
 import spam.blocker.config.CategorySelection
 import spam.blocker.config.Configs
 import spam.blocker.config.emptyCategorySelection
-import spam.blocker.db.Bot
-import spam.blocker.db.SpamTable
-import spam.blocker.service.bot.FileAction
 import spam.blocker.ui.M
 import spam.blocker.ui.setting.LabeledRow
 import spam.blocker.ui.widgets.FileChooser
@@ -72,14 +69,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 const val Backup_Last_Dir_Tag = "backup_last_dir_tag"
-
-fun missingBotSafUris(bots: List<Bot>) : List<Uri> {
-    return bots.flatMap { bot ->
-        bot.actions
-            .filterIsInstance<FileAction>() // Only keep FileActions
-            .mapNotNull { it.uriStr?.toUri() } // Convert to Uri, skip if null
-    }
-}
 
 
 @Composable
@@ -317,27 +306,10 @@ fun ExportButton() {
         )
     }
 
-    // Show a dialog for exporting database numbers, it can take long
-    val progressTrigger = remember { mutableStateOf(false) }
-    PopupDialog(
-        trigger = progressTrigger,
-        // the dialog cannot be dismissed by tapping around, it will only disappear when the export is done
-        manuallyDismissable = false
-    ) {
-        val total = remember { SpamTable.count(ctx) }
-        val estimate = remember { total/100_000 } // 100k numbers per second
-
-        Text(Str(R.string.exporting_database).formatAnnotated(
-            "$total".A(C.infoBlue), "$estimate".A(C.infoBlue)
-        ))
-    }
-
     // Show a system file chooser
 
     @SuppressLint("LocalContextGetResourceValueCall")
     fun chooseExportFile(categories: CategorySelection) {
-        val includeSpamDB = categories.isSelected(Category.SPAM_NUMBERS)
-
         // Prepare file name
         val formatter = DateTimeFormatter.ofPattern("yyyy_MM_dd")
         val ymd = LocalDate.now().format(formatter)
@@ -346,8 +318,6 @@ fun ExportButton() {
         } else {
             "SpamBlocker.${ymd}.gz"
         }
-
-        if (includeSpamDB) progressTrigger.value = true
 
         // prepare file content
         val curr = Configs()
@@ -366,7 +336,6 @@ fun ExportButton() {
                 rememberDirTag = Backup_Last_Dir_Tag,
             ),
             onResult = { uri ->
-                if (includeSpamDB) progressTrigger.value = false
                 if (uri != null) {
                     errorStr = writeDataToUri(ctx, uri, data)
                     succeeded = errorStr == null
@@ -428,7 +397,6 @@ fun ImportButton() {
 
     val resultTrigger = rememberSaveable { mutableStateOf(false) }
     var missingGlobalPermissions by remember { mutableStateOf("") }
-    val missingBotSafUris = remember { mutableStateListOf<Uri>() }
 
     if (resultTrigger.value) {
         OperationResultDialog(
@@ -443,7 +411,7 @@ fun ImportButton() {
                 }
             },
             extraContent = {
-                if (missingGlobalPermissions.isNotEmpty() || missingBotSafUris.isNotEmpty()) {
+                if (missingGlobalPermissions.isNotEmpty()) {
                     // 1. System permissions
                     val prevNames = missingGlobalPermissions
                         .split(",")
@@ -463,17 +431,6 @@ fun ImportButton() {
                             PermissionWrapper(it)
                         }.toMutableList()
 
-                    // 2. Workflow dir permissions
-                    missingBotSafUris
-                        .filter { !it.hasFolderAccess(ctx) }
-                        .forEach {
-                            val perm = PermissionType.SafDirAccess(uri = it)
-                            missingPermissions += PermissionWrapper(
-                                perm,
-                                prompt = ctx.getString(R.string.grant_access_to_dir).format("${it.toFolderDisplayName()}")
-                            )
-                        }
-
                     if (missingPermissions.isNotEmpty()) {
                         Text(
                             text = Str(R.string.missing_permissions),
@@ -489,14 +446,6 @@ fun ImportButton() {
                             color = C.teal200,
                         ) {
                             G.permissionChain.ask(ctx, missingPermissions) {
-                                // After finished, refresh `SAF permissions`.
-                                // No need to refresh global permissions, they trigger recomposition, but SAF doesn't.
-                                missingBotSafUris.apply {
-                                    clear()
-                                    addAll(missingBotSafUris.filter {
-                                        !it.hasFolderAccess(ctx)
-                                    })
-                                }
                             }
                         }
                     }
@@ -520,10 +469,6 @@ fun ImportButton() {
                     newCfg.apply(ctx, selectedCategories)
 
                     missingGlobalPermissions = newCfg.permissions?.allEnabledNames ?: ""
-                    missingBotSafUris.apply {
-                        clear()
-                        addAll(missingBotSafUris(newCfg.bots?.bots ?: emptyList()))
-                    }
                     succeeded = true
                     resultTrigger.value = true
 

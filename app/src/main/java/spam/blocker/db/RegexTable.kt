@@ -406,13 +406,7 @@ abstract class RegexTable(
 }
 
 open class NumberRegexTable : RegexTable(Db.TABLE_NUMBER_RULE)
-open class ContentRegexTable : RegexTable(Db.TABLE_CONTENT_RULE)
-open class QuickCopyRegexTable : RegexTable(Db.TABLE_QUICK_COPY_RULE)
 
 fun ruleTableForType(forType: Int): RegexTable {
-    return when (forType) {
-        Def.ForNumber -> NumberRegexTable()
-        Def.ForSms -> ContentRegexTable()
-        else -> QuickCopyRegexTable()
-    }
+    return NumberRegexTable()
 }

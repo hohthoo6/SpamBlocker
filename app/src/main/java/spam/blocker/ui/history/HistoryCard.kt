@@ -70,7 +70,6 @@ const val ItemHeight = CardHeight - 2 * CardPaddingVertical // the height of Ava
 fun HistoryCard(
     forType: Int,
     record: HistoryRecord,
-    indicators: Indicators,
     simCount: Int,
     timeColors: List<FreshnessColor>?,
     modifier: Modifier,
@@ -152,10 +151,6 @@ fun HistoryCard(
                                     .clip(RoundedCornerShape(9.dp))
                                 )
                             }
-
-                            // Db/Rule existence indicators
-                            if(indicators.isNotEmpty())
-                                IndicatorIcons(indicators)
 
                             // Number
                             var t = contact?.name ?: record.peer
@@ -254,52 +249,6 @@ fun HistoryCard(
                                 }
                             }
 
-                            // Auto/Manual Report Log
-                            if (record.autoReportingLog != null) {
-                                val trigger = remember { mutableStateOf(false) }
-                                val iconColor = if (record.anythingWrongReporting) C.warning else C.success
-
-                                if (record.expanded) {
-                                    // Show full screening log
-                                    PopupDialog(
-                                        trigger = trigger,
-                                        popupSize = PopupSize(maxWidthPercentage = 0.9f, minWidthDp = 320, maxWidthDp = 1200),
-                                    ) {
-                                        val annotatedLog = remember {
-                                            try {
-                                                val t = PermissiveJson.decodeFromString<MarkupText>(
-                                                    record.autoReportingLog
-                                                )
-                                                t.toAnnotatedString()
-                                            } catch (_: Exception) {
-                                                AnnotatedString("")
-                                            }
-                                        }
-                                        Text(
-                                            text = annotatedLog,
-                                        )
-                                    }
-                                    Button(
-                                        borderWidth = 0.5.dp,
-                                        borderColor = iconColor,
-                                        shape = RoundedCornerShape(BUTTON_CORNER_RADIUS.dp),
-                                        onClick = {
-                                            trigger.value = true
-                                        },
-                                        content = {
-                                            ResIcon20(
-                                                iconId = R.drawable.ic_upload_to_cloud,
-                                                color = iconColor,
-                                            )
-                                        }
-                                    )
-                                } else {
-                                    ResIcon20(
-                                        iconId = R.drawable.ic_upload_to_cloud,
-                                        color = iconColor,
-                                    )
-                                }
-                            }
                         }
                     }
 
@@ -308,9 +257,6 @@ fun HistoryCard(
                         SimAndTime(M.heightIn(ItemHeight.dp))
                     }
                 }
-
-                // Report Number / SMS Content
-                r.ExpandedContent(forType, record)
             }
 
             // Unread red dot

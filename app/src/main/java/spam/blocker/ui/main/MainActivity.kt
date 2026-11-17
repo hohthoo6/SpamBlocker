@@ -85,13 +85,11 @@ class MainActivity : ComponentActivity() {
             onTabReSelected = {
                 when (it) {
                     Def.CALL_TAB_ROUTE -> {Launcher.launchCallApp(this)}
-                    Def.SMS_TAB_ROUTE -> {Launcher.launchSMSApp(this)}
                 }
             },
             onTabLeave = {
                 when (it) {
                     Def.CALL_TAB_ROUTE -> G.callVM.markAllAsRead(this)
-                    Def.SMS_TAB_ROUTE -> G.smsVM.markAllAsRead(this)
                 }
             },
             tabItems = listOf(
@@ -106,18 +104,6 @@ class MainActivity : ComponentActivity() {
                     }
                 ) {
                     HistoryScreen(G.callVM)
-                },
-                TabItem(
-                    route = Def.SMS_TAB_ROUTE,
-                    label = ctx.resources.getString(R.string.sms),
-                    icon = R.drawable.ic_sms,
-                    isSelected = mutableStateOf(lastTab == Def.SMS_TAB_ROUTE),
-                    badgeText = {
-                        val unreadCount = G.smsVM.records.count { !it.read }
-                        if (unreadCount == 0) null else "$unreadCount"
-                    },
-                ) {
-                    HistoryScreen(G.smsVM)
                 },
                 TabItem(
                     route = Def.SETTING_TAB_ROUTE,
@@ -160,7 +146,6 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(showHistoryPassed.value, showHistoryBlocked.value) {
             withContext(IO) {
                 G.callVM.reload(ctx)
-                G.smsVM.reload(ctx)
             }
         }
 

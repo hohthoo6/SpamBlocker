@@ -28,11 +28,9 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import spam.blocker.G
 import spam.blocker.R
-import spam.blocker.db.ContentRegexTable
 import spam.blocker.db.Notification.Channel
 import spam.blocker.db.Notification.ChannelTable
 import spam.blocker.db.Notification.DefaultRepeatInterval
-import spam.blocker.db.NumberRegexTable
 import spam.blocker.ui.M
 import spam.blocker.ui.setting.LabeledRow
 import spam.blocker.ui.showSplitter
@@ -166,16 +164,10 @@ fun EditChannelDialog(
                     }
                 ) {
                     // Show a warning: this channel is currently used by following rules...
-                    val usedByRules = (NumberRegexTable().listAll(ctx) + ContentRegexTable().listAll(ctx))
-                        .filter { it.channel == chId }
-                        .map { ctx.getString(R.string.regex_pattern) + " " + it.descOrPattern() }
-                        .toMutableList()
+                    val usedByRules = mutableListOf<String>()
                     val spf = spf.Notification(ctx)
                     if (spf.spamCallChannelId == chId) {
                         usedByRules += ctx.getString(R.string.call)
-                    }
-                    if (spf.spamSmsChannelId == chId || spf.validSmsChannelId == chId) {
-                        usedByRules += ctx.getString(R.string.sms)
                     }
                     if (usedByRules.isNotEmpty()) {
                         HtmlText(ctx.getString(R.string.warning_delete_channel)
@@ -564,7 +556,6 @@ fun ChannelPicker(
 @Composable
 fun NotificationSummary(
     onCallClick: Lambda? = null,
-    onSmsClick: Lambda? = null,
 ) {
     val ctx = LocalContext.current
     val C = G.palette
@@ -572,8 +563,6 @@ fun NotificationSummary(
     val spf = spf.Notification(ctx)
 
     val spamCallChannelId = remember { spf.spamCallChannelId }
-    val spamSmsChannelId = remember { spf.spamSmsChannelId }
-    val validSmsChannelId = remember { spf.validSmsChannelId }
 
     RowVCenterSpaced(4, modifier = M.showSplitter() ) {
         // Call Button
@@ -592,35 +581,6 @@ fun NotificationSummary(
                 }
             )
         }
-
-        if (G.callEnabled.value && G.smsEnabled.value) {
-
-            if (G.smsEnabled.value) {
-                val chValid = G.notificationChannels.find {
-                    it.channelId == validSmsChannelId
-                }
-                val chSpam = G.notificationChannels.find {
-                    it.channelId == spamSmsChannelId
-                }
-                FooterButton(
-                    footerIconId = R.drawable.ic_sms,
-                    footerSize = 8,
-                    footerOffset = Pair(-3, -2),
-                    enabled = onSmsClick != null,
-                    icon = {
-                        RowVCenterSpaced(4) {
-                            // Valid SMS icon
-                            ChannelIcons(chValid?.importance, chValid?.mute)
-                            // Vertical Divider
-                            VerticalDivider(thickness = 1.dp, color = C.disabled)
-                            // Spam SMS icon
-                            ChannelIcons(chSpam?.importance, chSpam?.mute, color = C.error)
-                        }
-                    },
-                    onClick = onSmsClick
-                )
-            }
-        }
     }
 }
 
@@ -634,10 +594,6 @@ fun Notification() {
     // Call
     var spamCallChannelId by remember { mutableStateOf(spf.spamCallChannelId) }
 
-    // SMS
-    var spamSmsChannelId by remember { mutableStateOf(spf.spamSmsChannelId) }
-    var validSmsChannelId by remember { mutableStateOf(spf.validSmsChannelId) }
-    var activeSmsChatChannelId by remember { mutableStateOf(spf.smsChatChannelId) }
 
     // Call config popup
     val configTrigger = rememberSaveable { mutableStateOf(false) }
@@ -665,48 +621,6 @@ fun Notification() {
                     }
                 }
 
-                if (G.smsEnabled.value) {
-                    Section(
-                        title = Str(R.string.sms_channel),
-                        bgColor = C.background
-                    ) {
-                        Column {
-                            // 1. Allowed SMS
-                            LabeledRow(
-                                R.string.allowed,
-                            ) {
-                                ChannelPicker(
-                                    validSmsChannelId,
-                                ) { _, ch ->
-                                    spf.validSmsChannelId = ch.channelId
-                                    validSmsChannelId = ch.channelId
-                                }
-                            }
-                            // 2. Blocked SMS
-                            LabeledRow(
-                                R.string.blocked,
-                            ) {
-                                ChannelPicker(
-                                    spamSmsChannelId,
-                                ) { _, ch ->
-                                    spf.spamSmsChannelId = ch.channelId
-                                    spamSmsChannelId = ch.channelId
-                                }
-                            }
-                            // 3. Active SMS Chat
-                            LabeledRow(
-                                R.string.sms_chat,
-                            ) {
-                                ChannelPicker(
-                                    activeSmsChatChannelId,
-                                ) { _, ch ->
-                                    spf.smsChatChannelId = ch.channelId
-                                    activeSmsChatChannelId = ch.channelId
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     )
@@ -717,7 +631,6 @@ fun Notification() {
         content = {
             NotificationSummary(
                 onCallClick = { configTrigger.value = true},
-                onSmsClick = { configTrigger.value = true }
             )
         }
     )

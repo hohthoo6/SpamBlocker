@@ -107,7 +107,6 @@ dependencies {
     implementation(libs.androidx.runtime)
     // third-party
     implementation(libs.lazycolumnscrollbar) // for scroll bar
-    implementation(libs.reorderable) // for reordering Action items with drag & drop
 
     // google
     implementation(libs.libphonenumber) // for checking whether 33123 and +33123 are the same number
@@ -116,7 +115,6 @@ dependencies {
 
     // jetbrains kotlinx
     implementation(libs.serialization.json) // for backup/restore json serialization
-    implementation(libs.androidx.work.runtime.ktx) // for WorkManager
 
     // jetpack compose
     implementation(platform(libs.compose.bom)) // auto compose version control

@@ -8,9 +8,7 @@ import android.database.sqlite.SQLiteStatement
 import androidx.core.database.getIntOrNull
 import androidx.core.database.getStringOrNull
 import kotlinx.serialization.Serializable
-import spam.blocker.db.Db.Companion.COLUMN_ANYTHING_WRONG_REPORTING
 import spam.blocker.db.Db.Companion.COLUMN_ANYTHING_WRONG_SCREENING
-import spam.blocker.db.Db.Companion.COLUMN_AUTO_REPORTING_LOG
 import spam.blocker.db.Db.Companion.COLUMN_CNAP
 import spam.blocker.db.Db.Companion.COLUMN_EXPANDED
 import spam.blocker.db.Db.Companion.COLUMN_EXTRA_INFO
@@ -35,15 +33,11 @@ data class HistoryRecord(
 
     val time: Long = 0,
 
-    val result: Int = 0, // e.g.: RESULT_ALLOWED_BY_RECENT_APPS
-    // An extra information for the `result`
-    //  e.g.: pkgName for RecentApps, or API server echo for API query
+    val result: Int = 0,
     val reason: String = "",
 
     val simSlot: Int? = null,
 
-    // Generic extra information that not limited to any particular `result` type
-    //  e.g. SMS content
     val extraInfo: String? = null,
 
     val isTest: Boolean = false, // is it test number or real call
@@ -52,12 +46,8 @@ data class HistoryRecord(
 
     val fullScreeningLog: String? = null,
 
-    val autoReportingLog: String? = null, // Actually for both auto/manual reporting
-
-    // if anything went wrong during the screening, e.g. api query timed out
+    // if anything went wrong during the screening
     val anythingWrongScreening: Boolean = false,
-    // if anything went wrong when reporting, e.g. timed out
-    val anythingWrongReporting: Boolean = false,
 ) {
     fun isBlocked(): Boolean {
         return Def.isBlocked(result)
@@ -87,9 +77,7 @@ abstract class HistoryTable(
             extraInfo = cursor.getStringOrNull(cursor.getColumnIndex(COLUMN_EXTRA_INFO)),
             expanded = cursor.getIntOrNull(cursor.getColumnIndex(COLUMN_EXPANDED)) == 1,
             fullScreeningLog = cursor.getStringOrNull(cursor.getColumnIndex(COLUMN_FULL_SCREENING_LOG)),
-            autoReportingLog = cursor.getStringOrNull(cursor.getColumnIndex(COLUMN_AUTO_REPORTING_LOG)),
             anythingWrongScreening = cursor.getIntOrNull(cursor.getColumnIndex(COLUMN_ANYTHING_WRONG_SCREENING)) == 1,
-            anythingWrongReporting = cursor.getIntOrNull(cursor.getColumnIndex(COLUMN_ANYTHING_WRONG_REPORTING)) == 1
         )
     }
 
@@ -109,9 +97,7 @@ abstract class HistoryTable(
         cv.put(COLUMN_EXTRA_INFO, item.extraInfo)
         cv.put(COLUMN_EXPANDED, if (item.expanded) 1 else 0)
         cv.put(COLUMN_FULL_SCREENING_LOG, item.fullScreeningLog)
-        cv.put(COLUMN_AUTO_REPORTING_LOG, item.autoReportingLog)
         cv.put(COLUMN_ANYTHING_WRONG_SCREENING, if (item.anythingWrongScreening) 1 else 0)
-        cv.put(COLUMN_ANYTHING_WRONG_REPORTING, if (item.anythingWrongReporting) 1 else 0)
         return cv
     }
 
@@ -119,8 +105,8 @@ abstract class HistoryTable(
     override fun insertColumns(): List<String> = listOf(
         COLUMN_PEER, COLUMN_CNAP, COLUMN_TIME, COLUMN_RESULT,
         COLUMN_REASON, COLUMN_SIM_SLOT, COLUMN_READ, COLUMN_IS_TEST,
-        COLUMN_EXTRA_INFO, COLUMN_EXPANDED, COLUMN_FULL_SCREENING_LOG, COLUMN_AUTO_REPORTING_LOG,
-        COLUMN_ANYTHING_WRONG_SCREENING, COLUMN_ANYTHING_WRONG_REPORTING
+        COLUMN_EXTRA_INFO, COLUMN_EXPANDED, COLUMN_FULL_SCREENING_LOG,
+        COLUMN_ANYTHING_WRONG_SCREENING
     )
     // for batch insertion
     override fun bindInsertStatement(stmt: SQLiteStatement, item: HistoryRecord, baseIndex: Int) {
@@ -135,9 +121,7 @@ abstract class HistoryTable(
         item.extraInfo?.let { stmt.bindString(baseIndex + 8, it) } ?: stmt.bindNull(baseIndex + 8)
         stmt.bindLong(baseIndex + 9, if (item.expanded) 1 else 0)
         item.fullScreeningLog?.let { stmt.bindString(baseIndex + 10, it) } ?: stmt.bindNull(baseIndex + 10)
-        item.autoReportingLog?.let { stmt.bindString(baseIndex + 11, it) } ?: stmt.bindNull(baseIndex + 11)
-        stmt.bindLong(baseIndex + 12, if (item.anythingWrongScreening) 1 else 0)
-        stmt.bindLong(baseIndex + 13, if (item.anythingWrongReporting) 1 else 0)
+        stmt.bindLong(baseIndex + 11, if (item.anythingWrongScreening) 1 else 0)
     }
 
     fun listRecords(ctx: Context): List<HistoryRecord> {
@@ -152,7 +136,6 @@ abstract class HistoryTable(
             it.moveToFirst()
         }
     }
-
 
     fun markAsRead(ctx: Context, id: Long): Boolean {
         val cv = ContentValues()
@@ -170,14 +153,6 @@ abstract class HistoryTable(
         val cv = ContentValues()
         cv.put(COLUMN_EXPANDED, if(expanded) 1 else 0)
         return Db.getInstance(ctx).writableDatabase.update(tableName(), cv, "$COLUMN_ID = $id", null) == 1
-    }
-
-    fun setAutoReportLog(ctx: Context, recordId: Long, log: String, anythingWrong: Boolean): Boolean {
-        val cv = ContentValues()
-        cv.put(COLUMN_AUTO_REPORTING_LOG, log)
-        cv.put(COLUMN_ANYTHING_WRONG_REPORTING, if(anythingWrong) 1 else 0)
-
-        return Db.getInstance(ctx).writableDatabase.update(tableName(), cv, "$COLUMN_ID = $recordId", null) == 1
     }
 
     fun hasBlockedRecordsWithinSeconds(ctx: Context, durationSeconds: Int) : Boolean {
@@ -212,4 +187,3 @@ abstract class HistoryTable(
 }
 
 open class CallTable : HistoryTable(Db.TABLE_CALL)
-open class SmsTable : HistoryTable(Db.TABLE_SMS)

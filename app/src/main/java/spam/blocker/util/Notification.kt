@@ -3,8 +3,8 @@ package spam.blocker.util
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlarmManager
 import android.app.Notification.EXTRA_PREFER_SMALL_ICON
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.NotificationManager.IMPORTANCE_DEFAULT
@@ -42,6 +42,7 @@ import spam.blocker.def.Def.ANDROID_17
 import spam.blocker.service.CopyToClipboardReceiver
 import spam.blocker.service.NotificationRepeatReceiver
 import kotlin.random.Random
+
 
 
 object Notification {

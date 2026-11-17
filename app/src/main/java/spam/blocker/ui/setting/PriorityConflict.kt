@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import spam.blocker.G
 import spam.blocker.R
 import spam.blocker.service.checker.Checker.Companion.defaultCallCheckers
-import spam.blocker.service.checker.Checker.Companion.defaultSmsCheckers
 import spam.blocker.service.checker.IChecker
 import spam.blocker.service.checker.findConflicts
 import spam.blocker.ui.M
@@ -29,15 +28,10 @@ import spam.blocker.util.spf
 
 fun detectConflictCheckers(ctx: Context) : List<IChecker> {
     val callCheckers = defaultCallCheckers(ctx)
-        .filter { it.isConfigEnabledForCall() }
+        .filter { it.isConfigEnabled() }
         .findConflicts()
 
-    val smsCheckers = defaultSmsCheckers(ctx)
-        .filter { it.isConfigEnabledForSms() }
-        .findConflicts()
-
-    return (callCheckers + smsCheckers)
-        .distinctBy { it.desc() }
+    return callCheckers.distinctBy { it.desc() }
 
 }
 
